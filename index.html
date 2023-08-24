@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Pixel Drawing App</title>
+    <style>
+        canvas {
+            border: 1px solid #000;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <label for="canvas-width">Canvas Width:</label>
+        <input type="number" id="canvas-width" value="400">
+    </div>
+    <div>
+        <label for="canvas-height">Canvas Height:</label>
+        <input type="number" id="canvas-height" value="400">
+    </div>
+    <div>
+        <label for="zoom-level">Zoom Level:</label>
+        <input type="number" id="zoom-level" min="1" max="64" value="1">
+    </div>
+    <div>
+        <button id="toggle-mode">Toggle Mode</button>
+        <button id="save-button">Save</button>
+        <button id="load-button">Load</button>
+        <button id="save-png-button">Save as PNG</button> <!-- New button -->
+    </div>
+    <canvas id="canvas"></canvas>
+    <br>
+    <input type="color" id="color-picker">
+    <script>
+        const canvas = document.getElementById('canvas');
+        const colorPicker = document.getElementById('color-picker');
+        const canvasWidthInput = document.getElementById('canvas-width');
+        const canvasHeightInput = document.getElementById('canvas-height');
+        const zoomLevelInput = document.getElementById('zoom-level');
+        const toggleModeButton = document.getElementById('toggle-mode');
+        const saveButton = document.getElementById('save-button');
+        const loadButton = document.getElementById('load-button');
+        const savePngButton = document.getElementById('save-png-button'); // New button
+
+        const ctx = canvas.getContext('2d');
+        let currentColor = colorPicker.value;
+        let zoomLevel = parseInt(zoomLevelInput.value);
+        let isErasing = false;
+        let savedPixels = [];
+
+        function drawPixel(x, y) {
+            ctx.fillStyle = currentColor;
+            ctx.fillRect(x, y, 1, 1);
+            savedPixels.push({ x, y, color: currentColor });
+        }
+
+        function erasePixel(x, y) {
+            ctx.clearRect(x, y, 1, 1);
+            savedPixels = savedPixels.filter(pixel => !(pixel.x === x && pixel.y === y));
+        }
+
+        function resizeAndZoomCanvas() {
+            const width = parseInt(canvasWidthInput.value);
+            const height = parseInt(canvasHeightInput.value);
+
+            canvas.width = width * zoomLevel;
+            canvas.height = height * zoomLevel;
+            ctx.scale(zoomLevel, zoomLevel);
+            redrawSavedPixels();
+        }
+
+        function redrawSavedPixels() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            savedPixels.forEach(pixel => {
+                ctx.fillStyle = pixel.color;
+                ctx.fillRect(pixel.x, pixel.y, 1, 1);
+            });
+        }
+
+        function getScaledMouseCoordinates(event) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = Math.floor((event.clientX - rect.left) * scaleX / zoomLevel);
+            const y = Math.floor((event.clientY - rect.top) * scaleY / zoomLevel);
+            return { x, y };
+        }
+
+        canvas.addEventListener('mousedown', function(event) {
+            if (isErasing) {
+                const { x, y } = getScaledMouseCoordinates(event);
+                erasePixel(x, y);
+            } else {
+                const { x, y } = getScaledMouseCoordinates(event);
+                drawPixel(x, y);
+            }
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            if (isErasing && event.buttons === 1) {
+                const { x, y } = getScaledMouseCoordinates(event);
+                erasePixel(x, y);
+            } else if (!isErasing && event.buttons === 1) {
+                const { x, y } = getScaledMouseCoordinates(event);
+                drawPixel(x, y);
+            }
+        });
+
+        colorPicker.addEventListener('change', function(event) {
+            currentColor = event.target.value;
+        });
+
+        canvasWidthInput.addEventListener('change', resizeAndZoomCanvas);
+        canvasHeightInput.addEventListener('change', resizeAndZoomCanvas);
+
+        zoomLevelInput.addEventListener('change', function() {
+            const zoom = parseInt(zoomLevelInput.value);
+            if (zoom >= 1 && zoom <= 64) {
+                zoomLevel = zoom;
+                resizeAndZoomCanvas();
+            }
+        });
+
+        toggleModeButton.addEventListener('click', function() {
+            isErasing = !isErasing;
+            if (isErasing) {
+                toggleModeButton.style.backgroundColor = 'green';
+            } else {
+                toggleModeButton.style.backgroundColor = 'red';
+            }
+        });
+
+        saveButton.addEventListener('click', function() {
+            const savedData = JSON.stringify(savedPixels);
+            localStorage.setItem('drawingData', savedData);
+            alert('Drawing saved successfully!');
+        });
+
+        loadButton.addEventListener('click', function() {
+            const savedData = localStorage.getItem('drawingData');
+            if (savedData) {
+                savedPixels = JSON.parse(savedData);
+                redrawSavedPixels();
+                alert('Drawing loaded successfully!');
+            } else {
+                alert('No saved drawing found.');
+            }
+        });
+
+        savePngButton.addEventListener('click', function() {
+            const img = new Image();
+            img.width = canvas.width;
+            img.height = canvas.height;
+            img.src = canvas.toDataURL('image/png');
+
+            const link = document.createElement('a');
+            link.href = img.src;
+            link.download = 'pixel_drawing.png';
+            link.style.display = 'none';
+
+            document.body.appendChild(link);
+            link.click();
+
+            document.body.removeChild(link);
+        });
+
+        resizeAndZoomCanvas();
+    </script>
+</body>
+</html>
